@@ -7,10 +7,12 @@ import csv
 import re
 import zlib
 from termcolor import cprint, colored
-from colorama import just_fix_windows_console
+# from colorama import just_fix_windows_console
 from enum import Enum
 
-REGEX_PATTERN_TEXT = '^((?:[1-9]|1[0-1])|(?:#(?:[1-9]|[1-2]\d|3[0-3])))-(\d{1,2}|100)(?:-(\d{1,2}|100))?(?:-(EXP|LIN|LOG))?$'
+messages = []
+
+REGEX_PATTERN_TEXT = r'^((?:[1-9]|1[0-1])|(?:#(?:[1-9]|[1-2]\d|3[0-3])))-(\d{1,2}|100)(?:-(\d{1,2}|100))?(?:-(EXP|LIN|LOG))?$'
 
 # +------------------------------------+
 # |                                    |
@@ -67,6 +69,9 @@ def buildArgumentsParser() -> argparse.ArgumentParser:
 
 # Check the requirements
 def checkRequirements():
+    # Check if Python version is 3.10 or higher
+    if sys.version_info < (3, 10):
+        raise Exception(f"You are using Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}. This script requires Python 3.10 or higher.")
     return
 
 
@@ -95,20 +100,25 @@ def performChecks(args: dict):
 # Print critical error message and exit
 def printCriticalError(message: str, exitCode: int = 1):
     printError(message)
-    #raise Exception(message)
-    sys.exit(exitCode)
+    raise Exception(message)
 
 # Print error message
 def printError(message, start: str = ""):
-    cprint(start + "ERROR: " + message, color="red", attrs=["bold"], file=sys.stderr)
+    global messages
+    messages.append({'type': 'error', 'message': message, 'color': 'red'})
+    # cprint(start + "ERROR: " + message, color="red", attrs=["bold"], file=sys.stderr)
 
 # Print warning message
 def printWarning(message, start: str = ""):
-    cprint(start + "WARNING: " + message, color="yellow", attrs=["bold"])
+    global messages
+    messages.append({'type': 'warning', 'message': message, 'color': 'yellow'})
+    # cprint(start + "WARNING: " + message, color="yellow", attrs=["bold"])
 
 # Print info message
 def printInfo(message, start: str = ""):
-    cprint(start + "INFO: " + message, color="cyan")
+    global messages
+    messages.append({'type': 'info', 'message': message, 'color': 'cyan'})
+    # cprint(start + "INFO: " + message, color="cyan")
 
 # +------------------------------------+
 # |                                    |
@@ -235,7 +245,7 @@ def audacity_to_glyphs(file: str, disableCompatibility: bool = False, watermarkP
     author_data: list[list[int]] = [[0 for x in range(5)] for y in range(numLines)] if globalModeState == GlobalMode['Compatibility'] else [[0 for x in range(33)] for y in range(numLines)]
 
     # Generate AUTHOR data and write the CUSTOM1 file
-    with open(f"{filename}.glyphc1", "w") as authorFile:
+    with open(f"./temp-files/{filename}.glyphc1", "w") as authorFile:
         for i, label in enumerate(labels):
             # Get values
             fromTime: int = get_divisable_by(round(label['from']), TIME_STEP_SIZE)
@@ -306,7 +316,7 @@ def audacity_to_glyphs(file: str, disableCompatibility: bool = False, watermarkP
         watermarkData = encode_watermark_from_file(watermarkPath, len(author_data[0]))
 
     # Write the AUTHOR file
-    with open(f"{filename}.glypha", "w", newline='') as authorFile:
+    with open(f"./temp-files/{filename}.glypha", "w", newline='') as authorFile:
         csvWriter = csv.writer(authorFile, delimiter=',', lineterminator=',\r\n', strict=True)
         csvWriter.writerows(author_data)
         if watermarkPath:
@@ -346,9 +356,23 @@ def encode_watermark_from_file(watermarkPath: str, numColumns: int) -> list[list
 # |                                    |
 # +------------------------------------+
 
+def convert_label(filename):
+    global messages
+    messages = []
+    try:
+        audacity_to_glyphs(filename)
+    except:
+        return messages
+    messages.append({
+        'type': 'info',
+        'message': 'Done!',
+        'color': 'green'
+    })
+    return messages
+
 def main() -> int:
     # Fix the windows console - needed for correct color output
-    just_fix_windows_console()
+    # just_fix_windows_console()
 
     # Parse the arguments
     args = buildArgumentsParser().parse_args()
@@ -365,7 +389,7 @@ def main() -> int:
     # Normal mode - convert Audacity Labels to Glyphs format
     audacity_to_glyphs(args.FILE[0], args.disableCompatibility, args.watermark[0] if args.watermark is not None else None)
 
-    cprint("Done!", color="green", attrs=["bold"])
+    # cprint("Done!", color="green", attrs=["bold"])
 
     return 0
 
@@ -374,5 +398,5 @@ if __name__ == "__main__":
         sys.exit(main())
     except KeyboardInterrupt:
         printCriticalError("Interrupted by user.", 130)
-    # except Exception as e:
-    #     printCriticalError(str(e))
+    except Exception as e:
+        printCriticalError(str(e))

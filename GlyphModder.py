@@ -9,10 +9,12 @@ import zlib
 import json
 import csv
 from termcolor import cprint, colored
-from colorama import just_fix_windows_console
+# from colorama import just_fix_windows_console
 from enum import Enum
 
 base64_padding = '=='
+
+messages = []
 
 # +------------------------------------+
 # |                                    |
@@ -46,6 +48,9 @@ def buildArgumentsParser() -> argparse.ArgumentParser:
 
 # Check the requirements
 def checkRequirements(ffmpeg: str, ffprobe: str, write: bool):
+    # Check if Python version is 3.10 or higher
+    if sys.version_info < (3, 10):
+        raise Exception(f"You are using Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}. This script requires Python 3.10 or higher.")
     if write:
         try:
             # Check if ffmpeg is installed - write metadata
@@ -79,20 +84,25 @@ def performChecks(args: dict):
 # Print critical error message and exit
 def printCriticalError(message: str, exitCode: int = 1):
     printError(message)
-    #raise Exception(message)
-    sys.exit(exitCode)
+    raise Exception(message)
 
 # Print error message
 def printError(message, start: str = ""):
-    cprint(start + "ERROR: " + message, color="red", attrs=["bold"], file=sys.stderr)
+    global messages
+    messages.append({'type': 'error', 'message': message, 'color': 'red'})
+    # cprint(start + "ERROR: " + message, color="red", attrs=["bold"], file=sys.stderr)
 
 # Print warning message
 def printWarning(message, start: str = ""):
-    cprint(start + "WARNING: " + message, color="yellow", attrs=["bold"])
+    global messages
+    messages.append({'type': 'warning', 'message': message, 'color': 'yellow'})
+    # cprint(start + "WARNING: " + message, color="yellow", attrs=["bold"])
 
 # Print info message
 def printInfo(message, start: str = ""):
-    cprint(start + "INFO: " + message, color="cyan")
+    global messages
+    messages.append({'type': 'info', 'message': message, 'color': 'cyan'})
+    # cprint(start + "INFO: " + message, color="cyan")
 
 # +------------------------------------+
 # |                                    |
@@ -278,8 +288,19 @@ def write_metadata(file: str, author_file: str, custom1_file: str, custom_title:
     ffmpeg_write_metadata(ffmpeg, file, tmp_file, ffmpegMetadata)
 
     # Print number of bytes written
-    print(f"Wrote {colored(len(bytearray(encoded_author, 'utf-8')), attrs=['bold'])} bytes of AUTHOR metadata")
-    print(f"Wrote {colored(len(bytearray(encoded_custom1, 'utf-8')), attrs=['bold'])} bytes of CUSTOM1 metadata")
+    # print(f"Wrote {colored(len(bytearray(encoded_author, 'utf-8')), attrs=['bold'])} bytes of AUTHOR metadata")
+    # print(f"Wrote {colored(len(bytearray(encoded_custom1, 'utf-8')), attrs=['bold'])} bytes of CUSTOM1 metadata")
+    messages.append({
+        'type': 'info',
+        'message': 'Wrote ' + str(len(bytearray(encoded_author, 'utf-8'))) + ' bytes of AUTHOR metadata',
+        'color': 'grey'
+    })
+
+    messages.append({
+        'type': 'info',
+        'message': 'Wrote ' + str(len(bytearray(encoded_custom1, 'utf-8'))) + ' bytes of CUSTOM1 metadata',
+        'color': 'grey'
+    })
 
 def read_metadata(file: str, ffprobe: str):
     # Get the metadata from the file with ffmpeg (first audio stream only)
@@ -382,9 +403,23 @@ def encode_watermark(watermark: str, numColumns: int) -> list[list[int]]:
 # |                                    |
 # +------------------------------------+
 
+def write_meta(filename, glypha, glyphc):
+    global messages
+    messages = []
+    try:
+        write_metadata(filename, glypha, glyphc, 'MyCustomSong', 'ffmpeg')
+    except:
+        return messages
+    messages.append({
+        'type': 'info',
+        'message': 'Done!',
+        'color': 'green'
+    })
+    return messages
+
 def main() -> int:
     # Fix the windows console - needed for correct color output
-    just_fix_windows_console()
+    # just_fix_windows_console()
     
     # Parse the arguments
     args = buildArgumentsParser().parse_args()
@@ -405,7 +440,7 @@ def main() -> int:
         # Read the metadata from the file
         read_metadata(args.FILE[0], args.ffprobe[0])
 
-    cprint("Done!", color="green", attrs=["bold"])
+    # cprint("Done!", color="green", attrs=["bold"])
 
     return 0
 
@@ -414,5 +449,5 @@ if __name__ == "__main__":
         sys.exit(main())
     except KeyboardInterrupt:
         printCriticalError("Interrupted by user.", 130)
-    # except Exception as e:
-    #     printCriticalError(str(e))
+    except Exception as e:
+        printCriticalError(str(e))
