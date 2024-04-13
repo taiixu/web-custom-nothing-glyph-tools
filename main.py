@@ -257,7 +257,8 @@ def trim_upload():
     samplerate, data = scipy.io.wavfile.read(wav_filepath)
     duration = len(data) / samplerate
     os.remove(wav_filepath)
-    data = data[:-(len(data) % 100)]
+    if len(data) % 100 != 0:
+        data = data[:-(len(data) % 100)]
     arrays = np.split(data, 100)
     avg = []
     for c in arrays:
