@@ -269,9 +269,13 @@ def trim_upload():
         avg_final.append(float(c / m))
     
     try:
+        author_parsed = []
         custom_parsed = []
         author, custom = trimmer.read_meta(f'temp-files/{filename}')
+        author = author.split('\r\n')[:-1]
         custom = custom.split(',')[:-1]
+        for c in author:
+            author_parsed.append(','.join(c.split(',')[:-1]))
         for c in custom:
             custom_parsed.append([int(c.split('-')[0]) / (duration * 1000), int(c.split('-')[1])])
     except:
@@ -281,6 +285,7 @@ def trim_upload():
         'error': False, 
         'url': f"{URL}/api/getfile/{filename}",
         'peaks': avg_final,
+        'author': author_parsed,
         'custom': custom_parsed,
         'duration': duration
     })
